@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browse Movies — Movie Mania</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: #0a0a0a; color: #fff; }
+        .navbar { position: sticky; top: 0; z-index: 1000; background: rgba(10,10,10,0.95); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255,255,255,0.1); padding: 1rem 2rem; }
+        .nav-container { max-width: 1400px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; gap: 2rem; flex-wrap: wrap; }
+        .logo { display: flex; align-items: center; gap: 0.75rem; font-size: 1.5rem; font-weight: 800; text-decoration: none; }
+        .logo-icon { width: 36px; height: 36px; background: linear-gradient(135deg, #e50914, #ff006e); border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+        .logo-icon i { color: white; }
+        .logo-text { background: linear-gradient(135deg, #e50914, #ff006e); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .nav-links { display: flex; gap: 2rem; align-items: center; }
+        .nav-links a { color: #b3b3b3; text-decoration: none; transition: color 0.3s; }
+        .nav-links a:hover, .nav-links a.active { color: white; }
+        .btn { padding: 0.5rem 1.2rem; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s; border: none; display: inline-flex; align-items: center; gap: 0.5rem; }
+        .btn-primary { background: linear-gradient(135deg, #e50914, #ff006e); color: white; }
+        .btn-outline { background: transparent; border: 2px solid #e50914; color: #e50914; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+        .search-bar { margin-bottom: 2rem; }
+        .search-input { width: 100%; padding: 1rem 1.5rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 50px; color: white; font-size: 1rem; }
+        .search-input:focus { outline: none; border-color: #e50914; }
+        .movies-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1.5rem; margin-top: 1rem; }
+        .movie-card { background: #111; border-radius: 12px; overflow: hidden; cursor: pointer; transition: all 0.3s; border: 1px solid #222; }
+        .movie-card:hover { transform: translateY(-5px); border-color: #e50914; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        .movie-poster { width: 100%; height: 280px; object-fit: cover; }
+        .movie-info { padding: 1rem; }
+        .movie-title { font-weight: 600; margin-bottom: 0.5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .movie-rating { color: #ffc107; font-size: 0.85rem; }
+        .filter-sidebar { position: sticky; top: 100px; background: #111; border-radius: 16px; padding: 1.5rem; border: 1px solid #333; }
+        .form-group { margin-bottom: 1rem; }
+        .form-label { display: block; margin-bottom: 0.5rem; color: #b3b3b3; font-size: 0.85rem; }
+        .form-select { width: 100%; padding: 0.75rem; background: #1a1a1a; border: 1px solid #333; border-radius: 8px; color: white; }
+        .footer { background: #0a0a0a; border-top: 1px solid rgba(255,255,255,0.1); padding: 3rem 2rem 1rem; margin-top: 4rem; text-align: center; color: #888; }
+        .loading { text-align: center; padding: 2rem; color: #888; }
+        .error-box { text-align: center; padding: 3rem; background: rgba(229,9,20,0.1); border-radius: 16px; margin: 2rem; border: 1px solid #e50914; }
+        @media (max-width: 768px) { .movies-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem; } .movie-poster { height: 220px; } .filter-sidebar { position: relative; top: 0; margin-bottom: 1rem; } }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="index.html" class="logo"><div class="logo-icon"><i class="fas fa-film"></i></div><span class="logo-text">MOVIE MANIA</span></a>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="search.html" class="active">Browse</a>
+                <a href="blog.html">Blog</a>
+                <div id="authButtons"></div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="search-bar">
+            <input type="text" id="searchInput" class="search-input" placeholder="Search for movies by title...">
+        </div>
+        
+        <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+            <aside style="width: 280px; flex-shrink: 0;">
+                <div class="filter-sidebar">
+                    <h3 style="margin-bottom: 1rem; color: #e50914;">Filters</h3>
+                    <div class="form-group">
+                        <label class="form-label">Genre</label>
+                        <select id="filterGenre" class="form-select">
+                            <option value="">All Genres</option>
+                            <option value="1">Action</option><option value="2">Sci-Fi</option>
+                            <option value="3">Thriller</option><option value="4">Animation</option>
+                            <option value="5">Drama</option><option value="6">Comedy</option>
+                            <option value="7">Romance</option><option value="8">Horror</option>
+                        </select>
+                    </div>
+                    <button id="applyFilters" class="btn btn-primary" style="width: 100%;">Apply Filters</button>
+                    <button id="resetFilters" class="btn btn-outline" style="width: 100%; margin-top: 0.5rem;">Reset</button>
+                </div>
+            </aside>
+            
+            <main style="flex: 1;">
+                <div id="resultsCount" style="margin-bottom: 1rem; color: #888;"></div>
+                <div id="moviesGrid" class="movies-grid">
+                    <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading movies...</div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <footer class="footer"><p>&copy; 2024 Movie Mania. All rights reserved.</p></footer>
+
+    <script>
+        const API_BASE = 'php/';
+        let allMovies = [];
+        let currentUser = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuth();
+            loadMovies();
+            setupEventListeners();
+        });
+
+        function checkAuth() {
+            const stored = localStorage.getItem('movieManiaUser');
+            if (stored) {
+                currentUser = JSON.parse(stored);
+                updateAuthUI();
+            }
+        }
+
+        function updateAuthUI() {
+            const authContainer = document.getElementById('authButtons');
+            if (authContainer && currentUser) {
+                authContainer.innerHTML = `
+                    <div style="display: flex; gap: 1rem; align-items: center;">
+                        <span>👋 ${currentUser.username}</span>
+                        <button onclick="logout()" class="btn btn-outline" style="padding: 0.3rem 1rem;">Logout</button>
+                    </div>
+                `;
+            } else {
+                authContainer.innerHTML = `<a href="login.html" class="btn btn-outline">Sign In</a><a href="register.html" class="btn btn-primary">Join Free</a>`;
+            }
+        }
+
+        function logout() { localStorage.removeItem('movieManiaUser'); window.location.href = 'index.html'; }
+
+        async function loadMovies() {
+            try {
+                const response = await fetch(API_BASE + 'movies.php');
+                allMovies = await response.json();
+                displayMovies(allMovies);
+            } catch (error) {
+                document.getElementById('moviesGrid').innerHTML = '<div class="error-box">Error loading movies</div>';
+            }
+        }
+
+        function displayMovies(movies) {
+            const container = document.getElementById('moviesGrid');
+            const resultsCount = document.getElementById('resultsCount');
+            
+            if (!movies || movies.length === 0) {
+                container.innerHTML = '<div class="error-box">No movies found</div>';
+                resultsCount.innerHTML = 'Found 0 movies';
+                return;
+            }
+            
+            resultsCount.innerHTML = `Found ${movies.length} movies`;
+            container.innerHTML = movies.map(movie => `
+                <div class="movie-card" onclick="viewMovie(${movie.id})">
+                    <img class="movie-poster" src="${movie.poster_url}" onerror="this.src='https://via.placeholder.com/300x450?text=No+Poster'">
+                    <div class="movie-info">
+                        <div class="movie-title">${escapeHtml(movie.title)}</div>
+                        <div class="movie-rating"><i class="fas fa-star"></i> ${(movie.rating || 0).toFixed(1)}/5</div>
+                        <div style="font-size: 0.7rem; color: #666;">${movie.release_date ? movie.release_date.split('-')[0] : ''}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function setupEventListeners() {
+            document.getElementById('applyFilters').addEventListener('click', applyFilters);
+            document.getElementById('resetFilters').addEventListener('click', resetFilters);
+            document.getElementById('searchInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') applyFilters();
+            });
+        }
+
+        function applyFilters() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const genre = document.getElementById('filterGenre').value;
+            
+            let filtered = [...allMovies];
+            if (searchTerm) filtered = filtered.filter(m => m.title.toLowerCase().includes(searchTerm));
+            if (genre) filtered = filtered.filter(m => m.genre_id == genre);
+            displayMovies(filtered);
+        }
+
+        function resetFilters() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('filterGenre').value = '';
+            displayMovies(allMovies);
+        }
+
+        function viewMovie(id) { window.location.href = `movie-details.html?id=${id}`; }
+        function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
+    </script>
+</body>
+</html>
