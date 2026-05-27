@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Mania — Home</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo"><i class="fas fa-film"></i> MOVIE MANIA</div>
+        <div class="nav-links">
+            <a href="/index.html" class="active">Home</a>
+            <a href="/browse.html">Browse</a>
+            <a href="/blog.html">Blog</a>
+            <div id="authButtons"></div>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <h1>Discover Movies <span>You'll Love</span></h1>
+        <p>Your personal cinema curator. Find, rate, and review the finest films.</p>
+        <a href="/browse.html" class="btn btn-primary"><i class="fas fa-search"></i> Browse Movies</a>
+    </section>
+
+    <div class="container">
+        <h2 style="margin-bottom: 1rem;">🔥 Top Rated Movies</h2>
+        <div id="trendingMovies" class="movies-grid">
+            <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2 style="margin-bottom: 1rem;">🎭 Explore by Genre</h2>
+        <div id="genresGrid" class="genres-grid">
+            <div class="loading">Loading...</div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>&copy; 2024 Movie Mania. All rights reserved. Made with ❤️ for cinema lovers.</p>
+    </footer>
+
+    <script>
+        let currentUser = null;
+
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/auth/check');
+                const data = await res.json();
+                if (data.logged_in) {
+                    currentUser = data.user;
+                    localStorage.setItem('movieManiaUser', JSON.stringify(currentUser));
+                } else {
+                    const stored = localStorage.getItem('movieManiaUser');
+                    if (stored) currentUser = JSON.parse(stored);
+                }
+                updateAuthUI();
+            } catch(e) { console.error(e); }
+        }
+
+        function updateAuthUI() {
+            const container = document.getElementById('authButtons');
+            if (currentUser) {
+                container.innerHTML = `
+                    <div class="user-menu">
+                        <div class="user-avatar"><i class="fas fa-user"></i></div>
+                        <div class="user-dropdown">
+                            <div class="dropdown-item"><i class="fas fa-user"></i> ${currentUser.username}</div>
+                            ${currentUser.is_admin ? '<a href="/admin.html" class="dropdown-item"><i class="fas fa-crown"></i> Admin Panel</a>' : ''}
+                            <a href="/profile.html" class="dropdown-item"><i class="fas fa-id-card"></i> Profile</a>
+                            <a href="/watchlist.html" class="dropdown-item"><i class="fas fa-bookmark"></i> Watchlist</a>
+                            <div class="dropdown-item" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = `<a href="/login.html" class="btn btn-outline">Sign In</a><a href="/register.html" class="btn btn-primary">Join Free</a>`;
+            }
+        }
+
+        async function logout() {
+            await fetch('/api/auth/logout');
+            localStorage.removeItem('movieManiaUser');
+            currentUser = null;
+            updateAuthUI();
+            window.location.href = '/index.html';
+        }
+
+        async function loadTrendingMovies() {
+            try {
+                const res = await fetch('/api/movies/top?limit=8');
+                const movies = await res.json();
+                const container = document.getElementById('trendingMovies');
+                container.innerHTML = movies.map(m => `
+                    <div class="movie-card" onclick="viewMovie(${m.id})">
+                        <img class="movie-poster" src="${m.poster_url}" onerror="this.src='https://via.placeholder.com/300x450?text=No+Poster'">
+                        <div class="movie-info">
+                            <div class="movie-title">${escapeHtml(m.title)}</div>
+                            <div class="movie-rating"><i class="fas fa-star"></i> ${m.rating}/5</div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch(e) { console.error(e); }
+        }
+
+        async function loadGenres() {
+            try {
+                const res = await fetch('/api/genres');
+                const genres = await res.json();
+                const container = document.getElementById('genresGrid');
+                container.innerHTML = genres.map(g => `
+                    <div class="genre-card" onclick="filterByGenre(${g.id}, '${g.name}')">
+                        <div style="font-size: 1.5rem;">🎬</div>
+                        <div style="font-weight: bold;">${g.name}</div>
+                        <div style="font-size: 0.7rem; color: #666;">${g.movie_count} movies</div>
+                    </div>
+                `).join('');
+            } catch(e) { console.error(e); }
+        }
+
+        function viewMovie(id) { window.location.href = `/movie.html?id=${id}`; }
+        function filterByGenre(id, name) { window.location.href = `/browse.html?genre=${id}`; }
+        function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
+
+        checkAuth();
+        loadTrendingMovies();
+        loadGenres();
+    </script>
+</body>
+</html>

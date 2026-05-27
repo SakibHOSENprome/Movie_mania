@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blog — Movie Mania</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .blog-header { text-align: center; padding: 3rem; background: linear-gradient(135deg, #1a1a1a, #0a0a0a); border-radius: 20px; margin-bottom: 2rem; }
+        .blog-header h1 { font-size: 2.5rem; }
+        .blog-header h1 span { color: #e50914; }
+        .blog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 2rem; }
+        .blog-card { background: #111; border-radius: 16px; overflow: hidden; transition: all 0.3s; border: 1px solid #222; cursor: pointer; }
+        .blog-card:hover { transform: translateY(-5px); border-color: #e50914; }
+        .blog-image { width: 100%; height: 200px; object-fit: cover; }
+        .blog-content { padding: 1.5rem; }
+        .blog-meta { display: flex; gap: 1rem; color: #888; font-size: 0.7rem; margin-bottom: 0.5rem; }
+        .blog-title { font-size: 1.2rem; margin-bottom: 0.5rem; }
+        .blog-excerpt { color: #b3b3b3; font-size: 0.9rem; margin-bottom: 1rem; }
+        .blog-author { display: flex; align-items: center; gap: 0.5rem; padding-top: 0.5rem; border-top: 1px solid #333; }
+        .author-avatar { width: 30px; height: 30px; background: linear-gradient(135deg, #e50914, #ff006e); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+        @media (max-width: 768px) { .blog-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo"><i class="fas fa-film"></i> MOVIE MANIA</div>
+        <div class="nav-links">
+            <a href="/index.html">Home</a>
+            <a href="/browse.html">Browse</a>
+            <a href="/blog.html" class="active">Blog</a>
+            <div id="authButtons"></div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="blog-header"><h1>Cinema <span>Chronicles</span></h1><p>Reviews, analysis, and cinematic deep dives</p></div>
+        <div id="blogGrid" class="blog-grid"></div>
+    </div>
+
+    <footer class="footer"><p>&copy; 2024 Movie Mania. All rights reserved.</p></footer>
+
+    <script>
+        const blogPosts = [
+            { title: "Top 10 Mind-Blowing Movies", excerpt: "From Inception to The Matrix, these films will leave you questioning reality...", image: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=400", date: "Dec 15, 2024", readTime: "8 min", author: "Alex Chen" },
+            { title: "Hidden Gems You Need to Watch", excerpt: "Discover cinematic treasures that flew under the radar but deserve your attention...", image: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400", date: "Dec 10, 2024", readTime: "6 min", author: "Maria Rodriguez" },
+            { title: "The Art of Storytelling", excerpt: "Exploring the elements that separate masterpieces from ordinary movies...", image: "https://images.unsplash.com/photo-1509347528160-9a9e33742cdb?w=400", date: "Dec 5, 2024", readTime: "10 min", author: "David Kim" }
+        ];
+        document.getElementById('blogGrid').innerHTML = blogPosts.map(p => `
+            <div class="blog-card" onclick="alert('Full article coming soon!')">
+                <img class="blog-image" src="${p.image}"><div class="blog-content">
+                <div class="blog-meta"><span><i class="fas fa-calendar"></i> ${p.date}</span><span><i class="fas fa-clock"></i> ${p.readTime}</span></div>
+                <h3 class="blog-title">${p.title}</h3><p class="blog-excerpt">${p.excerpt}</p>
+                <div class="blog-author"><div class="author-avatar">A</div><strong>${p.author}</strong></div></div>
+            </div>
+        `).join('');
+        
+        const stored = localStorage.getItem('movieManiaUser');
+        if (stored) document.getElementById('authButtons').innerHTML = `<span style="color:#e50914;"><i class="fas fa-user"></i> ${JSON.parse(stored).username}</span><a href="#" onclick="logout()" class="btn btn-outline" style="margin-left:1rem;">Logout</a>`;
+        else document.getElementById('authButtons').innerHTML = `<a href="/login.html" class="btn btn-outline">Sign In</a><a href="/register.html" class="btn btn-primary">Join Free</a>`;
+        
+        async function logout() { await fetch('/api/auth/logout'); localStorage.removeItem('movieManiaUser'); window.location.href = '/index.html'; }
+    </script>
+</body>
+</html>

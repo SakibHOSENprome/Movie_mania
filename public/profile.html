@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Profile — Movie Mania</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .profile-header { text-align: center; padding: 2rem; background: linear-gradient(135deg, #1a1a1a, #0a0a0a); border-radius: 20px; margin-bottom: 2rem; }
+        .profile-avatar { width: 100px; height: 100px; background: linear-gradient(135deg, #e50914, #ff006e); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; font-size: 2.5rem; }
+        .profile-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin: 2rem 0; }
+        .stat-card { background: #111; padding: 1.5rem; text-align: center; border-radius: 16px; border: 1px solid #333; }
+        .stat-number { font-size: 2rem; font-weight: bold; color: #e50914; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo"><i class="fas fa-film"></i> MOVIE MANIA</div>
+        <div class="nav-links">
+            <a href="/index.html">Home</a>
+            <a href="/browse.html">Browse</a>
+            <a href="/blog.html">Blog</a>
+            <div id="authButtons"></div>
+        </div>
+    </nav>
+
+    <div class="container"><div id="profileContent" class="loading">Loading profile...</div></div>
+    <footer class="footer"><p>&copy; 2024 Movie Mania. All rights reserved.</p></footer>
+
+    <script>
+        let currentUser = null;
+
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/auth/check');
+                const data = await res.json();
+                if (!data.logged_in && !localStorage.getItem('movieManiaUser')) { window.location.href = '/login.html'; return; }
+                currentUser = data.logged_in ? data.user : JSON.parse(localStorage.getItem('movieManiaUser'));
+                if (currentUser) updateAuthUI();
+                loadProfile();
+            } catch(e) { window.location.href = '/login.html'; }
+        }
+
+        function updateAuthUI() {
+            const container = document.getElementById('authButtons');
+            if (currentUser) {
+                container.innerHTML = `<span style="color:#e50914;"><i class="fas fa-user"></i> ${currentUser.username}</span><a href="#" onclick="logout()" class="btn btn-outline" style="margin-left:1rem;">Logout</a>`;
+            }
+        }
+
+        async function logout() { await fetch('/api/auth/logout'); localStorage.removeItem('movieManiaUser'); window.location.href = '/index.html'; }
+
+        async function loadProfile() {
+            try {
+                const res = await fetch('/api/watchlist');
+                const watchlist = await res.json();
+                document.getElementById('profileContent').innerHTML = `
+                    <div class="profile-header">
+                        <div class="profile-avatar"><i class="fas fa-user"></i></div>
+                        <h2>${escapeHtml(currentUser.username)}</h2>
+                        <p style="color:#888;">${currentUser.is_admin ? 'Administrator' : 'Movie Fan'}</p>
+                    </div>
+                    <div class="profile-stats">
+                        <div class="stat-card"><div class="stat-number">${watchlist.length}</div><div>Watchlist</div></div>
+                        <div class="stat-card"><div class="stat-number">8+</div><div>Movies Available</div></div>
+                    </div>
+                    <h3 style="margin-bottom:1rem;"><i class="fas fa-bookmark"></i> My Watchlist</h3>
+                    <div id="watchlistGrid" class="movies-grid"></div>
+                `;
+                if (watchlist.length) {
+                    document.getElementById('watchlistGrid').innerHTML = watchlist.map(m => `
+                        <div class="movie-card" onclick="viewMovie(${m.id})">
+                            <img class="movie-poster" src="${m.poster_url}" onerror="this.src='https://via.placeholder.com/150x200?text=No+Poster'">
+                            <div class="movie-info"><div class="movie-title">${escapeHtml(m.title)}</div><div style="color:#ffc107;">⭐ ${m.rating}/5</div></div>
+                        </div>
+                    `).join('');
+                } else {
+                    document.getElementById('watchlistGrid').innerHTML = '<p style="color:#888;text-align:center;">Your watchlist is empty.</p>';
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        function viewMovie(id) { window.location.href = `/movie.html?id=${id}`; }
+        function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
+
+        checkAuth();
+    </script>
+</body>
+</html>

@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Details — Movie Mania</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .movie-header { display: flex; gap: 2rem; flex-wrap: wrap; margin-bottom: 2rem; }
+        .movie-poster-large { width: 250px; border-radius: 12px; }
+        .movie-info { flex: 1; }
+        .movie-title { font-size: 2rem; margin-bottom: 0.5rem; }
+        .movie-meta { display: flex; gap: 1rem; margin: 1rem 0; flex-wrap: wrap; }
+        .meta-item { background: #1a1a1a; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem; }
+        .similar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 1rem; margin-top: 1rem; }
+        .similar-card { background: #111; border-radius: 8px; overflow: hidden; cursor: pointer; transition: all 0.3s; border: 1px solid #222; }
+        .similar-card:hover { transform: translateY(-3px); border-color: #e50914; }
+        .similar-poster { width: 100%; height: 180px; object-fit: cover; }
+        .similar-info { padding: 0.5rem; text-align: center; }
+        .similar-title { font-size: 0.8rem; font-weight: bold; }
+        textarea { width: 100%; padding: 0.8rem; background: #1a1a1a; border: 1px solid #333; border-radius: 8px; color: white; margin: 0.5rem 0; }
+        @media (max-width: 768px) { .movie-poster-large { width: 150px; } .movie-title { font-size: 1.5rem; } }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo"><i class="fas fa-film"></i> MOVIE MANIA</div>
+        <div class="nav-links">
+            <a href="/index.html">Home</a>
+            <a href="/browse.html">Browse</a>
+            <a href="/blog.html">Blog</a>
+            <div id="authButtons"></div>
+        </div>
+    </nav>
+
+    <div id="movieContent" class="container"><div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div></div>
+    <footer class="footer"><p>&copy; 2024 Movie Mania. All rights reserved.</p></footer>
+
+    <script>
+        let currentUser = null;
+        let selectedRating = 0;
+
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/auth/check');
+                const data = await res.json();
+                if (data.logged_in) {
+                    currentUser = data.user;
+                    localStorage.setItem('movieManiaUser', JSON.stringify(currentUser));
+                } else {
+                    const stored = localStorage.getItem('movieManiaUser');
+                    if (stored) currentUser = JSON.parse(stored);
+                }
+                updateAuthUI();
+            } catch(e) {}
+        }
+
+        function updateAuthUI() {
+            const container = document.getElementById('authButtons');
+            if (currentUser) {
+                container.innerHTML = `<span style="color:#e50914;"><i class="fas fa-user"></i> ${currentUser.username}</span><a href="#" onclick="logout()" class="btn btn-outline" style="margin-left:1rem;">Logout</a>`;
+            } else {
+                container.innerHTML = `<a href="/login.html" class="btn btn-outline">Sign In</a><a href="/register.html" class="btn btn-primary">Join Free</a>`;
+            }
+        }
+
+        async function logout() { await fetch('/api/auth/logout'); localStorage.removeItem('movieManiaUser'); window.location.href = '/index.html'; }
+
+        async function loadMovie() {
+            const params = new URLSearchParams(window.location.search);
+            const movieId = params.get('id');
+            if (!movieId) return;
+
+            try {
+                const res = await fetch(`/api/movies/${movieId}`);
+                const movie = await res.json();
+                renderMovie(movie);
+                loadSimilarMovies(movie.genre_id, movie.id);
+            } catch(e) { document.getElementById('movieContent').innerHTML = '<div class="error-box">Error loading movie</div>'; }
+        }
+
+        function renderMovie(movie) {
+            document.getElementById('movieContent').innerHTML = `
+                <div class="movie-header">
+                    <img class="movie-poster-large" src="${movie.poster_url}" onerror="this.src='https://via.placeholder.com/300x450?text=No+Poster'">
+                    <div class="movie-info">
+                        <h1 class="movie-title">${escapeHtml(movie.title)}</h1>
+                        <div class="movie-meta">
+                            <span class="meta-item"><i class="fas fa-calendar"></i> ${movie.release_date ? movie.release_date.split('-')[0] : 'N/A'}</span>
+                            <span class="meta-item"><i class="fas fa-tag"></i> ${movie.genre_name || 'Movie'}</span>
+                            <span class="meta-item"><i class="fas fa-star" style="color:#ffc107;"></i> ${movie.rating}/5</span>
+                        </div>
+                        <p><strong>Director:</strong> ${escapeHtml(movie.director || 'N/A')}</p>
+                        <p><strong>Cast:</strong> ${escapeHtml(movie.cast || 'N/A')}</p>
+                        <p><strong>Synopsis:</strong> ${escapeHtml(movie.description || 'No description available.')}</p>
+                        <button class="btn btn-primary" onclick="addToWatchlist(${movie.id})"><i class="fas fa-bookmark"></i> Add to Watchlist</button>
+                    </div>
+                </div>
+                <div><h3>🎬 Similar Movies</h3><div id="similarMovies" class="similar-grid"><div class="loading">Loading...</div></div></div>
+                <div style="margin-top: 2rem;"><h3>📝 Community Reviews</h3><div id="reviewsList"></div>
+                ${currentUser && !currentUser.is_admin ? `
+                    <div style="margin-top: 1rem;">
+                        <h4>Write a Review</h4>
+                        <div class="star-rating" id="starRating">${[1,2,3,4,5].map(s => `<i class="far fa-star" data-rating="${s}"></i>`).join('')}</div>
+                        <textarea id="reviewText" rows="3" placeholder="Share your thoughts..."></textarea>
+                        <button class="btn btn-primary" onclick="submitReview(${movie.id})">Post Review</button>
+                    </div>
+                ` : !currentUser ? `<p style="margin-top:1rem;"><a href="/login.html" style="color:#e50914;">Sign in</a> to rate and review</p>` : ''}</div>
+            `;
+            loadReviews(movie.id);
+            setupStarRating();
+        }
+
+        function setupStarRating() {
+            const stars = document.querySelectorAll('#starRating i');
+            stars.forEach(s => {
+                s.addEventListener('click', () => {
+                    selectedRating = parseInt(s.dataset.rating);
+                    stars.forEach(star => { const r = parseInt(star.dataset.rating); star.className = r <= selectedRating ? 'fas fa-star active' : 'far fa-star'; });
+                });
+            });
+        }
+
+        async function loadReviews(movieId) {
+            try {
+                const res = await fetch(`/api/movies/${movieId}`);
+                const movie = await res.json();
+                const reviews = movie.reviews || [];
+                const container = document.getElementById('reviewsList');
+                if (!reviews.length) { container.innerHTML = '<p>No reviews yet. Be the first!</p>'; return; }
+                container.innerHTML = reviews.map(r => `
+                    <div class="review-card">
+                        <div class="review-header"><strong><i class="fas fa-user"></i> ${escapeHtml(r.username)}</strong><span style="color:#ffc107;"><i class="fas fa-star"></i> ${r.rating}/5</span></div>
+                        <p>${escapeHtml(r.review_text)}</p>
+                        <small style="color:#888;">${new Date(r.created_at).toLocaleDateString()}</small>
+                    </div>
+                `).join('');
+            } catch(e) { console.error(e); }
+        }
+
+        async function loadSimilarMovies(genreId, currentId) {
+            try {
+                const res = await fetch(`/api/movies/genre/${genreId}`);
+                let movies = await res.json();
+                movies = movies.filter(m => m.id != currentId).slice(0, 4);
+                const container = document.getElementById('similarMovies');
+                if (!movies.length) { container.innerHTML = '<p>No similar movies found.</p>'; return; }
+                container.innerHTML = movies.map(m => `
+                    <div class="similar-card" onclick="viewMovie(${m.id})">
+                        <img class="similar-poster" src="${m.poster_url}" onerror="this.src='https://via.placeholder.com/150x200?text=No+Poster'">
+                        <div class="similar-info"><div class="similar-title">${escapeHtml(m.title)}</div><div style="color:#ffc107;font-size:0.7rem;">⭐ ${m.rating}/5</div></div>
+                    </div>
+                `).join('');
+            } catch(e) { console.error(e); }
+        }
+
+        async function submitReview(movieId) {
+            if (selectedRating === 0) { alert('Select a rating'); return; }
+            const reviewText = document.getElementById('reviewText').value.trim();
+            if (!reviewText) { alert('Write a review'); return; }
+            try {
+                const res = await fetch('/api/reviews', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ movie_id: movieId, rating: selectedRating, review_text: reviewText }) });
+                const result = await res.json();
+                if (result.success) { alert('Review posted!'); location.reload(); }
+                else alert('Failed to post review');
+            } catch(e) { alert('Error'); }
+        }
+
+        async function addToWatchlist(movieId) {
+            if (!currentUser) { window.location.href = '/login.html'; return; }
+            try {
+                const res = await fetch('/api/watchlist', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ movie_id: movieId }) });
+                const result = await res.json();
+                if (result.success) alert('Added to watchlist!');
+                else alert('Already in watchlist');
+            } catch(e) { alert('Error'); }
+        }
+
+        function viewMovie(id) { window.location.href = `/movie.html?id=${id}`; }
+        function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
+
+        checkAuth();
+        loadMovie();
+    </script>
+</body>
+</html>

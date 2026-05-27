@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel — Movie Mania</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .admin-header { background: linear-gradient(135deg, #1a1a1a, #0a0a0a); border-bottom: 2px solid #e50914; padding: 2rem; text-align: center; margin-bottom: 2rem; border-radius: 0 0 20px 20px; }
+        .form-card { background: #111; border-radius: 20px; padding: 2rem; margin-bottom: 2rem; border: 1px solid #333; }
+        .form-title { font-size: 1.3rem; margin-bottom: 1.5rem; color: #e50914; border-left: 3px solid #e50914; padding-left: 1rem; }
+        .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo"><i class="fas fa-film"></i> MOVIE MANIA</div>
+        <div class="nav-links">
+            <a href="/index.html">Home</a>
+            <a href="/browse.html">Browse</a>
+            <a href="/blog.html">Blog</a>
+            <a href="/admin.html" style="color:#e50914;">Admin</a>
+            <div id="authButtons"></div>
+        </div>
+    </nav>
+
+    <div class="admin-header"><h1><i class="fas fa-crown"></i> Admin Dashboard</h1><p>Manage your movie collection</p></div>
+
+    <div class="container">
+        <div class="form-card">
+            <h2 class="form-title"><i class="fas fa-plus-circle"></i> Add New Movie</h2>
+            <form id="addMovieForm">
+                <div class="form-row">
+                    <div class="form-group"><label>Movie Title *</label><input type="text" id="title" class="form-input" required></div>
+                    <div class="form-group"><label>Genre *</label><select id="genre_id" class="form-input"><option value="">Select</option><option value="1">Action</option><option value="2">Sci-Fi</option><option value="3">Thriller</option><option value="4">Animation</option><option value="5">Drama</option></select></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Director</label><input type="text" id="director" class="form-input"></div>
+                    <div class="form-group"><label>Release Date</label><input type="date" id="release_date" class="form-input"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Rating (1-5)</label><input type="number" id="rating" class="form-input" step="0.1" min="1" max="5" value="4.0"></div>
+                    <div class="form-group"><label>Poster URL</label><input type="url" id="poster_url" class="form-input" placeholder="https://..."></div>
+                </div>
+                <div class="form-group"><label>Cast</label><input type="text" id="cast" class="form-input"></div>
+                <div class="form-group"><label>Description</label><textarea id="description" class="form-input" rows="3"></textarea></div>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Add Movie</button>
+            </form>
+        </div>
+
+        <div class="form-card"><h2 class="form-title"><i class="fas fa-list"></i> Manage Movies</h2><div id="message"></div><div id="moviesGrid" class="movies-grid"><div class="loading">Loading...</div></div></div>
+    </div>
+
+    <footer class="footer"><p>&copy; 2024 Movie Mania. All rights reserved.</p></footer>
+
+    <script>
+        let currentUser = null;
+
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/auth/check');
+                const data = await res.json();
+                if (!data.logged_in && !localStorage.getItem('movieManiaUser')) { window.location.href = '/login.html'; return; }
+                currentUser = data.logged_in ? data.user : JSON.parse(localStorage.getItem('movieManiaUser'));
+                if (!currentUser.is_admin) { alert('Admin access only'); window.location.href = '/index.html'; return; }
+                updateAuthUI();
+                loadMovies();
+                setupForm();
+            } catch(e) { window.location.href = '/login.html'; }
+        }
+
+        function updateAuthUI() {
+            const container = document.getElementById('authButtons');
+            if (currentUser) {
+                container.innerHTML = `<span style="color:#e50914;"><i class="fas fa-user"></i> ${currentUser.username}</span><a href="#" onclick="logout()" class="btn btn-outline" style="margin-left:1rem;">Logout</a>`;
+            }
+        }
+
+        async function logout() { await fetch('/api/auth/logout'); localStorage.removeItem('movieManiaUser'); window.location.href = '/index.html'; }
+
+        async function loadMovies() {
+            try {
+                const res = await fetch('/api/movies');
+                const movies = await res.json();
+                const container = document.getElementById('moviesGrid');
+                if (!movies.length) { container.innerHTML = '<div class="loading">No movies yet</div>'; return; }
+                container.innerHTML = movies.map(m => `
+                    <div class="movie-card">
+                        <img class="movie-poster" src="${m.poster_url}" onerror="this.src='https://via.placeholder.com/300x450?text=No+Poster'">
+                        <div class="movie-info">
+                            <div class="movie-title">${escapeHtml(m.title)}</div>
+                            <div class="movie-rating">⭐ ${m.rating}/5</div>
+                            <button class="btn btn-danger" style="margin-top:0.5rem;width:100%;" onclick="deleteMovie(${m.id})"><i class="fas fa-trash"></i> Delete</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch(e) { console.error(e); }
+        }
+
+        function setupForm() { document.getElementById('addMovieForm').addEventListener('submit', addMovie); }
+
+        async function addMovie(e) {
+            e.preventDefault();
+            const genreNames = {1:'Action',2:'Sci-Fi',3:'Thriller',4:'Animation',5:'Drama'};
+            const genre_id = parseInt(document.getElementById('genre_id').value);
+            const movieData = {
+                title: document.getElementById('title').value.trim(),
+                director: document.getElementById('director').value.trim(),
+                release_date: document.getElementById('release_date').value,
+                genre_id: genre_id,
+                genre_name: genreNames[genre_id],
+                rating: parseFloat(document.getElementById('rating').value) || 4.0,
+                poster_url: document.getElementById('poster_url').value.trim() || 'https://via.placeholder.com/300x450?text=No+Poster',
+                cast: document.getElementById('cast').value.trim() || 'Coming soon',
+                description: document.getElementById('description').value.trim() || 'No description'
+            };
+            try {
+                const res = await fetch('/api/movies', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(movieData) });
+                const result = await res.json();
+                if (result.success) { showMessage('Movie added!', 'success'); document.getElementById('addMovieForm').reset(); loadMovies(); }
+                else showMessage('Failed', 'error');
+            } catch(e) { showMessage('Error', 'error'); }
+        }
+
+        async function deleteMovie(id) {
+            if (!confirm('Delete this movie?')) return;
+            try { await fetch(`/api/movies/${id}`, { method: 'DELETE' }); loadMovies(); showMessage('Movie deleted', 'success'); } 
+            catch(e) { showMessage('Error', 'error'); }
+        }
+
+        function showMessage(msg, type) { const m = document.getElementById('message'); m.innerHTML = `<div style="background:${type === 'success' ? 'rgba(0,200,83,0.2)' : 'rgba(229,9,20,0.2)'}; border:1px solid ${type === 'success' ? '#00c853' : '#e50914'}; border-radius:8px; padding:1rem; margin-bottom:1rem;">${msg}</div>`; setTimeout(() => m.innerHTML = '', 3000); }
+        function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
+
+        checkAuth();
+    </script>
+</body>
+</html>

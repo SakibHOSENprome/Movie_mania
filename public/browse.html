@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browse Movies — Movie Mania</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .search-input {
+            width: 100%;
+            padding: 1rem;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 50px;
+            color: white;
+            font-size: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .search-input:focus { outline: none; border-color: #e50914; }
+        .filter-sidebar { background: #111; border-radius: 16px; padding: 1.5rem; border: 1px solid #333; position: sticky; top: 80px; }
+        @media (max-width: 768px) { .filter-sidebar { position: relative; top: 0; margin-bottom: 1rem; } }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo"><i class="fas fa-film"></i> MOVIE MANIA</div>
+        <div class="nav-links">
+            <a href="/index.html">Home</a>
+            <a href="/browse.html" class="active">Browse</a>
+            <a href="/blog.html">Blog</a>
+            <div id="authButtons"></div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <input type="text" id="searchInput" class="search-input" placeholder="Search for movies...">
+        
+        <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+            <aside style="width: 250px;">
+                <div class="filter-sidebar">
+                    <h3 style="margin-bottom: 1rem; color: #e50914;">Filters</h3>
+                    <label>Genre</label>
+                    <select id="genreFilter" class="form-group" style="width: 100%; padding: 0.5rem; background: #1a1a1a; border: 1px solid #333; border-radius: 8px; color: white; margin-top: 0.3rem;">
+                        <option value="">All Genres</option>
+                    </select>
+                    <button id="applyFilter" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Apply</button>
+                    <button id="resetFilter" class="btn btn-outline" style="width: 100%; margin-top: 0.5rem;">Reset</button>
+                </div>
+            </aside>
+            <main style="flex: 1;">
+                <div id="resultsCount" style="margin-bottom: 0.5rem; color: #888;"></div>
+                <div id="moviesGrid" class="movies-grid"><div class="loading">Loading...</div></div>
+            </main>
+        </div>
+    </div>
+
+    <footer class="footer"><p>&copy; 2024 Movie Mania. All rights reserved.</p></footer>
+
+    <script>
+        let allMovies = [];
+        let currentUser = null;
+
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/auth/check');
+                const data = await res.json();
+                if (data.logged_in) {
+                    currentUser = data.user;
+                    localStorage.setItem('movieManiaUser', JSON.stringify(currentUser));
+                } else {
+                    const stored = localStorage.getItem('movieManiaUser');
+                    if (stored) currentUser = JSON.parse(stored);
+                }
+                updateAuthUI();
+            } catch(e) {}
+        }
+
+        function updateAuthUI() {
+            const container = document.getElementById('authButtons');
+            if (currentUser) {
+                container.innerHTML = `<span style="color:#e50914;"><i class="fas fa-user"></i> ${currentUser.username}</span><a href="#" onclick="logout()" class="btn btn-outline" style="margin-left:1rem;">Logout</a>`;
+            } else {
+                container.innerHTML = `<a href="/login.html" class="btn btn-outline">Sign In</a><a href="/register.html" class="btn btn-primary">Join Free</a>`;
+            }
+        }
+
+        async function logout() { await fetch('/api/auth/logout'); localStorage.removeItem('movieManiaUser'); window.location.href = '/index.html'; }
+
+        async function loadMovies() {
+            try {
+                const res = await fetch('/api/movies');
+                allMovies = await res.json();
+                displayMovies(allMovies);
+                loadGenres();
+                const params = new URLSearchParams(window.location.search);
+                if (params.get('genre')) document.getElementById('genreFilter').value = params.get('genre');
+                if (params.get('genre')) applyFilters();
+            } catch(e) { console.error(e); }
+        }
+
+        async function loadGenres() {
+            try {
+                const res = await fetch('/api/genres');
+                const genres = await res.json();
+                const select = document.getElementById('genreFilter');
+                select.innerHTML = '<option value="">All Genres</option>' + genres.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+            } catch(e) {}
+        }
+
+        function displayMovies(movies) {
+            const container = document.getElementById('moviesGrid');
+            document.getElementById('resultsCount').innerHTML = `Found ${movies.length} movies`;
+            if (!movies.length) { container.innerHTML = '<div class="loading">No movies found</div>'; return; }
+            container.innerHTML = movies.map(m => `
+                <div class="movie-card" onclick="viewMovie(${m.id})">
+                    <img class="movie-poster" src="${m.poster_url}" onerror="this.src='https://via.placeholder.com/300x450?text=No+Poster'">
+                    <div class="movie-info">
+                        <div class="movie-title">${escapeHtml(m.title)}</div>
+                        <div class="movie-rating"><i class="fas fa-star"></i> ${m.rating}/5</div>
+                        <div style="font-size:0.7rem;color:#666;">${m.release_date ? m.release_date.split('-')[0] : ''}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function applyFilters() {
+            let filtered = [...allMovies];
+            const genre = document.getElementById('genreFilter').value;
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            if (genre) filtered = filtered.filter(m => m.genre_id == genre);
+            if (search) filtered = filtered.filter(m => m.title.toLowerCase().includes(search));
+            displayMovies(filtered);
+        }
+
+        document.getElementById('applyFilter').addEventListener('click', applyFilters);
+        document.getElementById('resetFilter').addEventListener('click', () => { document.getElementById('genreFilter').value = ''; document.getElementById('searchInput').value = ''; displayMovies(allMovies); });
+        document.getElementById('searchInput').addEventListener('keyup', applyFilters);
+        function viewMovie(id) { window.location.href = `/movie.html?id=${id}`; }
+        function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
+
+        checkAuth();
+        loadMovies();
+    </script>
+</body>
+</html>

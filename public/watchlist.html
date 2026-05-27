@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Watchlist — Movie Mania</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo"><i class="fas fa-film"></i> MOVIE MANIA</div>
+        <div class="nav-links">
+            <a href="/index.html">Home</a>
+            <a href="/browse.html">Browse</a>
+            <a href="/blog.html">Blog</a>
+            <div id="authButtons"></div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1 style="margin-bottom: 1.5rem;"><i class="fas fa-bookmark"></i> My Watchlist</h1>
+        <div id="watchlistGrid" class="movies-grid"><div class="loading">Loading...</div></div>
+    </div>
+
+    <footer class="footer"><p>&copy; 2024 Movie Mania. All rights reserved.</p></footer>
+
+    <script>
+        let currentUser = null;
+
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/auth/check');
+                const data = await res.json();
+                if (!data.logged_in && !localStorage.getItem('movieManiaUser')) { window.location.href = '/login.html'; return; }
+                currentUser = data.logged_in ? data.user : JSON.parse(localStorage.getItem('movieManiaUser'));
+                if (currentUser) updateAuthUI();
+                loadWatchlist();
+            } catch(e) { window.location.href = '/login.html'; }
+        }
+
+        function updateAuthUI() {
+            const container = document.getElementById('authButtons');
+            if (currentUser) {
+                container.innerHTML = `<span style="color:#e50914;"><i class="fas fa-user"></i> ${currentUser.username}</span><a href="#" onclick="logout()" class="btn btn-outline" style="margin-left:1rem;">Logout</a>`;
+            }
+        }
+
+        async function logout() { await fetch('/api/auth/logout'); localStorage.removeItem('movieManiaUser'); window.location.href = '/index.html'; }
+
+        async function loadWatchlist() {
+            try {
+                const res = await fetch('/api/watchlist');
+                const watchlist = await res.json();
+                const container = document.getElementById('watchlistGrid');
+                if (!watchlist.length) { container.innerHTML = '<div class="empty-state" style="text-align:center;padding:3rem;"><i class="fas fa-film"></i><p>Your watchlist is empty.</p><a href="/browse.html" class="btn btn-outline" style="margin-top:1rem;">Browse Movies</a></div>'; return; }
+                container.innerHTML = watchlist.map(m => `
+                    <div class="movie-card">
+                        <img class="movie-poster" src="${m.poster_url}" onerror="this.src='https://via.placeholder.com/300x450?text=No+Poster'">
+                        <div class="movie-info">
+                            <div class="movie-title">${escapeHtml(m.title)}</div>
+                            <div class="movie-rating"><i class="fas fa-star"></i> ${m.rating}/5</div>
+                            <button class="btn btn-danger" style="margin-top:0.5rem;width:100%;" onclick="removeFromWatchlist(${m.id})"><i class="fas fa-trash"></i> Remove</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch(e) { console.error(e); }
+        }
+
+        async function removeFromWatchlist(movieId) {
+            try {
+                await fetch(`/api/watchlist/${movieId}`, { method: 'DELETE' });
+                loadWatchlist();
+            } catch(e) { alert('Error'); }
+        }
+
+        function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
+
+        checkAuth();
+    </script>
+</body>
+</html>
